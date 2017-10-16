@@ -1,0 +1,1 @@
+./AsiDasOpenCv --cascade="bin/haarcascade_frontalface_alt.xml" --nested-cascade="bin/haarcascade_eye_tree_eyeglasses.xml" --scale=1.3

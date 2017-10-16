@@ -2,6 +2,7 @@
 #include "opencv2/highgui.hpp"
 #include "opencv2/imgproc.hpp"
 #include <iostream>
+
 using namespace std;
 using namespace cv;
 
@@ -12,20 +13,28 @@ static void help()
 
 void detectAndDraw( Mat& img, CascadeClassifier& cascade,
                     CascadeClassifier& nestedCascade,
-                    double scale, bool tryflip );
+                    double scale, bool tryFlip );
 
 
+const double PI = 3.14159265;
 const String windowName = "symulator nerda ASI";
 
 string cascadeName;
 string nestedCascadeName;
 
 bool debugMode = false;
-Mat overlay;
+int overlayMode = 1;
+
+Mat overlay, overlay2, overlay3;
 
 int main( int argc, const char** argv )
 {
-    overlay = imread ( "overlay.png", -1 );
+    srand((uint)time(NULL));
+
+    //load overlays
+    overlay = imread ( "bin/overlay.png", -1 );
+    overlay2 = imread ( "bin/overlay2.png", -1 );
+    overlay3 = imread ( "bin/overlay3.png", -1 );
 
     VideoCapture capture;
     Mat frame, image;
@@ -114,6 +123,18 @@ int main( int argc, const char** argv )
             else if(input == 'd' || input == 'D' ) {
                 debugMode = !debugMode;
             }
+            else if(input == '0'){
+                overlayMode = 0;
+            }
+            else if(input == '1'){
+                overlayMode = 1;
+            }
+            else if(input == '2'){
+                overlayMode = 2;
+            }
+            else if(input == '3'){
+                overlayMode = 3;
+            }
         }
     }
     else
@@ -150,6 +171,18 @@ int main( int argc, const char** argv )
                         else if(input == 'd' || input == 'D' ) {
                             debugMode = !debugMode;
                         }
+                        else if(input == '0'){
+                            overlayMode = 0;
+                        }
+                        else if(input == '1'){
+                            overlayMode = 1;
+                        }
+                        else if(input == '2'){
+                            overlayMode = 2;
+                        }
+                        else if(input == '3'){
+                            overlayMode = 3;
+                        }
 
                     }
                     else {
@@ -176,6 +209,8 @@ void overlayImage(const cv::Mat &background, cv::Mat foreground,
         Point2f src_center(foreground.cols / 2.0F, foreground.rows / 2.0F); //rotate overlay
         Mat rot_mat = getRotationMatrix2D(src_center, angle, 1.0);
         warpAffine(foreground, foreground2, rot_mat, foreground.size());
+    } else{
+        foreground2 = foreground;
     }
 
     background.copyTo(output);
@@ -226,7 +261,7 @@ void overlayImage(const cv::Mat &background, cv::Mat foreground,
 
 void detectAndDraw( Mat& img, CascadeClassifier& cascade,
                     CascadeClassifier& nestedCascade,
-                    double scale, bool tryflip )
+                    double scale, bool tryFlip )
 {
     double t = 0;
     vector<Rect> faces, faces2;
@@ -255,7 +290,7 @@ void detectAndDraw( Mat& img, CascadeClassifier& cascade,
         |CASCADE_SCALE_IMAGE,
         Size(30, 30) );
 
-    if( tryflip )
+    if( tryFlip )
     {
         flip(smallImg, smallImg, 1);
         cascade.detectMultiScale( smallImg, faces2,
@@ -270,17 +305,20 @@ void detectAndDraw( Mat& img, CascadeClassifier& cascade,
         }
     }
 
+    //debug console
     t = (double)getTickCount() - t;
-    printf( "FacesCount = %d; DetectionTime = %g ms; Debug = %d\n", (int)faces.size(), t*1000/getTickFrequency(), debugMode);
+    printf( "FacesCount = %d; DetectionTime = %g ms; Debug = %d; Overlay = %d\n",
+            (int)faces.size(), t*1000/getTickFrequency(), debugMode, overlayMode);
 
     for ( size_t i = 0; i < faces.size(); i++ )
     {
         Rect r = faces[i];
         Mat smallImgROI;
         vector<Rect> nestedObjects;
-        Point center;
+        Point center, center2;
         Scalar color = colors[i%8];
-        int radius;
+        int radius = 0;
+        int radius2 = 0;
         double aspect_ratio = (double)r.width/r.height;
 
         if( 0.75 < aspect_ratio && aspect_ratio < 1.3 )
@@ -314,21 +352,61 @@ void detectAndDraw( Mat& img, CascadeClassifier& cascade,
         for ( size_t j = 0; j < nestedObjects.size(); j++ )
         {
             Rect nr = nestedObjects[j];
-            center.x = cvRound((r.x + nr.x + nr.width*0.5)*scale);
-            center.y = cvRound((r.y + nr.y + nr.height*0.5)*scale);
-            radius = cvRound((nr.width + nr.height)*0.25*scale);
+            center2.x = cvRound((r.x + nr.x + nr.width*0.5)*scale);
+            center2.y = cvRound((r.y + nr.y + nr.height*0.5)*scale);
+            radius2 = cvRound((nr.width + nr.height)*0.25*scale);
             if(debugMode) {
-                circle(img, center, radius, color, 3, 8, 0);
+                circle(img, center2, radius2, color, 3, 8, 0);
             }
         }
-    }
 
-    overlayImage(img, overlay, img, cv::Point(0,0), 1.0, 120.0); //draw overlay
+        //draw overlay here
+        if(overlayMode == 1) { //draw smile overlay
+            overlayImage(img, overlay, img,
+                         cv::Point(center.x - (int)(overlay.size().width / 2*(radius / 100.0)),
+                                   center.y - (int)(overlay.size().height / 2*(radius / 100.0))), radius / 100.0, 0.0);
+        }
+        if(overlayMode == 2 || overlayMode == 3) { //draw smile overlay
+
+            double angle = 0.0;
+
+            //calculate angle
+            if(nestedObjects.size() >= 2){
+                Point eye1, eye2;
+
+                Rect eRect1 = nestedObjects[0];
+                eye1.x = cvRound((r.x + eRect1.x + eRect1.width*0.5)*scale);
+                eye1.y = cvRound((r.y + eRect1.y + eRect1.height*0.5)*scale);
+
+                Rect eRect2 = nestedObjects[1];
+                eye2.x = cvRound((r.x + eRect2.x + eRect2.width*0.5)*scale);
+                eye2.y = cvRound((r.y + eRect2.y + eRect2.height*0.5)*scale);
+
+                angle = atan((double)(eye2.y - eye1.y) / (double)(eye2.x - eye1.x)) * 180.0 / PI * -1.0;
+
+                if(abs(angle) < 5.0){ //discard angle change under 5 degrees
+                    angle = 0.0;
+                }
+            }
+
+
+            if(overlayMode == 2) {
+                overlayImage(img, overlay2, img,
+                             cv::Point(center.x - (int) (overlay2.size().width / 2 * (radius / 125.0)),
+                                       center.y - (int) (overlay2.size().height / 2 * (radius / 125.0))), radius / 50.0, angle);
+            }
+            else{
+                overlayImage(img, overlay3, img,
+                             cv::Point(center.x - (int) (overlay3.size().width / 2 * (radius / 370.0)),
+                                       center.y - (int) (overlay3.size().height / 2 * (radius / 270.0))), radius / 150.0, angle);
+            }
+
+        }
+    }
 
     if(!debugMode) {
         putText(img, "Symulator typowego ASIowicza", Point(70, 50),
                 CV_FONT_HERSHEY_DUPLEX, 1.0, (0, 255, 128), 2, LINE_AA); //draw text
-
     }
 
     resize(img, img, Size(img.cols*2, img.rows*2)); // scale window
