@@ -24,8 +24,10 @@ string nestedCascadeName;
 
 bool debugMode = false;
 int overlayMode = 1;
+bool faceAmountChanged = false;
+int lastFaceAmount = 0;
 
-Mat overlay, overlay2, overlay3;
+Mat overlay, overlay2, overlay3, overlay4;
 
 int main( int argc, const char** argv )
 {
@@ -35,6 +37,7 @@ int main( int argc, const char** argv )
     overlay = imread ( "bin/overlay.png", -1 );
     overlay2 = imread ( "bin/overlay2.png", -1 );
     overlay3 = imread ( "bin/overlay3.png", -1 );
+    overlay4 = imread ( "bin/overlay4.png", -1 );
 
     VideoCapture capture;
     Mat frame, image;
@@ -123,17 +126,8 @@ int main( int argc, const char** argv )
             else if(input == 'd' || input == 'D' ) {
                 debugMode = !debugMode;
             }
-            else if(input == '0'){
-                overlayMode = 0;
-            }
-            else if(input == '1'){
-                overlayMode = 1;
-            }
-            else if(input == '2'){
-                overlayMode = 2;
-            }
-            else if(input == '3'){
-                overlayMode = 3;
+            else if(input >= '0' && input <= '4'){
+                overlayMode = (int)input - '0';
             }
         }
     }
@@ -171,17 +165,8 @@ int main( int argc, const char** argv )
                         else if(input == 'd' || input == 'D' ) {
                             debugMode = !debugMode;
                         }
-                        else if(input == '0'){
-                            overlayMode = 0;
-                        }
-                        else if(input == '1'){
-                            overlayMode = 1;
-                        }
-                        else if(input == '2'){
-                            overlayMode = 2;
-                        }
-                        else if(input == '3'){
-                            overlayMode = 3;
+                        else if(input >= '0' && input <= '4'){
+                            overlayMode = (int)input - '0';
                         }
 
                     }
@@ -201,12 +186,13 @@ void overlayImage(const cv::Mat &background, cv::Mat foreground,
 
     cv::Mat foreground2;
 
-    if(scale != 1.0) {
-        cv::resize(foreground, foreground, cv::Size((int) (200 * scale), (int) (200 * scale))); //resize overlay
+    if(scale != 1.0) { //resize overlay
+        cv::resize(foreground, foreground,
+                   cv::Size((int) (foreground.size().width * scale), (int) (foreground.size().height * scale)));
     }
 
-    if (angle != 0.0) {
-        Point2f src_center(foreground.cols / 2.0F, foreground.rows / 2.0F); //rotate overlay
+    if (angle != 0.0) { //rotate overlay
+        Point2f src_center(foreground.cols / 2.0F, foreground.rows / 2.0F);
         Mat rot_mat = getRotationMatrix2D(src_center, angle, 1.0);
         warpAffine(foreground, foreground2, rot_mat, foreground.size());
     } else{
@@ -305,10 +291,11 @@ void detectAndDraw( Mat& img, CascadeClassifier& cascade,
         }
     }
 
-    //debug console
-    t = (double)getTickCount() - t;
-    printf( "FacesCount = %d; DetectionTime = %g ms; Debug = %d; Overlay = %d\n",
-            (int)faces.size(), t*1000/getTickFrequency(), debugMode, overlayMode);
+    //detect change in faces size
+    if(lastFaceAmount != (int)faces.size()){
+        faceAmountChanged = true;
+    }
+    lastFaceAmount = (int)faces.size();
 
     for ( size_t i = 0; i < faces.size(); i++ )
     {
@@ -366,7 +353,7 @@ void detectAndDraw( Mat& img, CascadeClassifier& cascade,
                          cv::Point(center.x - (int)(overlay.size().width / 2*(radius / 100.0)),
                                    center.y - (int)(overlay.size().height / 2*(radius / 100.0))), radius / 100.0, 0.0);
         }
-        if(overlayMode == 2 || overlayMode == 3) { //draw smile overlay
+        if(overlayMode >= 2) { //draw overlay with angle tracking
 
             double angle = 0.0;
 
@@ -389,24 +376,73 @@ void detectAndDraw( Mat& img, CascadeClassifier& cascade,
                 }
             }
 
+            static int dealGlasses = 0;
+
+            if(faceAmountChanged){
+                if(dealGlasses > 0){
+                    dealGlasses -= 4;
+                }
+                else if(dealGlasses < 0){
+                    dealGlasses = 0;
+                    faceAmountChanged = false;
+                }
+
+                if(faceAmountChanged && dealGlasses == 0){
+                    dealGlasses = 201;
+                }
+            }
 
             if(overlayMode == 2) {
                 overlayImage(img, overlay2, img,
-                             cv::Point(center.x - (int) (overlay2.size().width / 2 * (radius / 125.0)),
-                                       center.y - (int) (overlay2.size().height / 2 * (radius / 125.0))), radius / 50.0, angle);
+                             cv::Point(center.x - (int) (overlay2.size().width / 2 * (radius / 140.0)),
+                                       center.y - (int) (overlay2.size().height / 2 * (radius / 140.0))), radius / 140.0, angle);
             }
-            else{
+            else if(overlayMode == 3){
                 overlayImage(img, overlay3, img,
-                             cv::Point(center.x - (int) (overlay3.size().width / 2 * (radius / 370.0)),
-                                       center.y - (int) (overlay3.size().height / 2 * (radius / 270.0))), radius / 150.0, angle);
+                             cv::Point(center.x - (int) (overlay3.size().width / 2 * (radius / 300.0)),
+                                       center.y - (int) (overlay3.size().height / 2 * (radius / 300.0))), radius / 290.0, angle);
             }
+            else if(overlayMode == 4){
 
+                if(faceAmountChanged){
+                    angle = 0.0;
+                }
+
+                overlayImage(img, overlay4, img,
+                             cv::Point(center.x - (int) (overlay4.size().width / 2 * (radius / 90.0)),
+                                       center.y - (int) (overlay4.size().height / 2 * (radius / 90.0)) - dealGlasses), radius / 90.0, angle);
+            }
         }
     }
 
+    //debug console
+    t = (double)getTickCount() - t;
+    printf( "FacesCount = %d; DetectionTime = %g ms; Debug = %d; Overlay = %d\n",
+            (int)faces.size(), t*1000/getTickFrequency(), debugMode, overlayMode);
+
+    String text;
+    switch(overlayMode){
+        case 1:
+            text = "Usmiechnij sie!";
+            break;
+        case 2:
+            text = "Symulator typowego ASIowicza";
+            break;
+        case 3:
+            text = "Gdy za dlugo siedzisz na kompie";
+            break;
+        case 4:
+            text = !faceAmountChanged ? "Deal with it!" : "";
+            break;
+        default:
+            text = "";
+    }
+
     if(!debugMode) {
-        putText(img, "Symulator typowego ASIowicza", Point(70, 50),
-                CV_FONT_HERSHEY_DUPLEX, 1.0, (0, 255, 128), 2, LINE_AA); //draw text
+        putText(img, text, Point(10, 30),
+                CV_FONT_HERSHEY_DUPLEX, 0.8, (0, 255, 255), 2, LINE_AA); //draw text
+        putText(img, "1. emotka, 2. kuc z ASI, 3. bryle, 4. deal with it!", Point(5, 470),
+                FONT_HERSHEY_COMPLEX_SMALL, 0.8, (0, 255, 255), 2, LINE_AA);
     }
 
     resize(img, img, Size(img.cols*2, img.rows*2)); // scale window
