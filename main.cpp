@@ -23,7 +23,10 @@ string cascadeName;
 string nestedCascadeName;
 
 bool debugMode = false;
+bool rollingMode = false;
+
 int overlayMode = 1;
+
 bool faceAmountChanged = false;
 int lastFaceAmount = 0;
 
@@ -31,7 +34,7 @@ Mat overlay, overlay2, overlay3, overlay4;
 
 int main( int argc, const char** argv )
 {
-    srand((uint)time(NULL));
+    srand((uint)time(nullptr));
 
     //load overlays
     overlay = imread ( "bin/overlay.png", -1 );
@@ -45,11 +48,12 @@ int main( int argc, const char** argv )
     bool tryFlip;
     CascadeClassifier cascade, nestedCascade;
     double scale;
+    double cam = 0;
     cv::CommandLineParser parser(argc, argv,
         "{help h||}"
         "{cascade|../../data/haarcascades/haarcascade_frontalface_alt.xml|}"
         "{nested-cascade|../../data/haarcascades/haarcascade_eye_tree_eyeglasses.xml|}"
-        "{scale|1|}{try-flip||}{@filename||}"
+        "{scale|1|}{cam|0|}{try-flip||}{@filename||}"
     );
 
     if (parser.has("help")) {
@@ -60,6 +64,8 @@ int main( int argc, const char** argv )
     cascadeName = parser.get<string>("cascade");
     nestedCascadeName = parser.get<string>("nested-cascade");
     scale = parser.get<double>("scale");
+
+    cam = parser.get<double>("cam");
 
     if (scale < 1){
         scale = 1;
@@ -85,7 +91,7 @@ int main( int argc, const char** argv )
     }
 
     if( inputName.empty() || (isdigit(inputName[0]) && inputName.size() == 1) ) {
-        int camera = inputName.empty() ? 0 : inputName[0] - '0';
+        int camera = inputName.empty() ? (int)cam : inputName[(int)cam] - '0';
         if(!capture.open(camera)) {
             cout << "Capture from camera #" << camera << " didn't work" << endl;
         }
@@ -126,8 +132,12 @@ int main( int argc, const char** argv )
             else if(input == 'd' || input == 'D' ) {
                 debugMode = !debugMode;
             }
+            else if(input == 's' || input == 'S'){
+                rollingMode = !rollingMode;
+            }
             else if(input >= '0' && input <= '4'){
                 overlayMode = (int)input - '0';
+                rollingMode = false;
             }
         }
     }
@@ -142,7 +152,7 @@ int main( int argc, const char** argv )
         else if( !inputName.empty() )
         {
             /* assume it is a text file containing the
-            list of the image filenames to be processed - one per line */
+            list of the image file names to be processed - one per line */
             FILE* f = fopen( inputName.c_str(), "rt" );
             if( f )
             {
@@ -165,8 +175,12 @@ int main( int argc, const char** argv )
                         else if(input == 'd' || input == 'D' ) {
                             debugMode = !debugMode;
                         }
+                        else if(input == 's' || input == 'S'){
+                            rollingMode = !rollingMode;
+                        }
                         else if(input >= '0' && input <= '4'){
                             overlayMode = (int)input - '0';
+                            rollingMode = false;
                         }
 
                     }
@@ -222,7 +236,7 @@ void overlayImage(const cv::Mat &background, cv::Mat foreground,
             if(fX >= foreground2.cols)
                 break;
 
-            // determine the opacity of the foregrond pixel, using its fourth (alpha) channel.
+            // determine the opacity of the foreground pixel, using its fourth (alpha) channel.
             double opacity =
                     ((double)foreground2.data[fY * foreground2.step + fX * foreground2.channels() + 3])
 
@@ -296,6 +310,19 @@ void detectAndDraw( Mat& img, CascadeClassifier& cascade,
         faceAmountChanged = true;
     }
     lastFaceAmount = (int)faces.size();
+
+    static time_t scrollTime = time(nullptr);
+
+    //rolling mode
+    if(rollingMode) {
+        if (time(nullptr) - scrollTime > 2) {
+            scrollTime = time(nullptr);
+            ++overlayMode;
+            if (overlayMode == 5) {
+                overlayMode = 1;
+            }
+        }
+    }
 
     for ( size_t i = 0; i < faces.size(); i++ )
     {
@@ -380,7 +407,7 @@ void detectAndDraw( Mat& img, CascadeClassifier& cascade,
 
             if(faceAmountChanged){
                 if(dealGlasses > 0){
-                    dealGlasses -= 4;
+                    dealGlasses -= 5;
                 }
                 else if(dealGlasses < 0){
                     dealGlasses = 0;
@@ -392,7 +419,7 @@ void detectAndDraw( Mat& img, CascadeClassifier& cascade,
                 }
             }
 
-            if(overlayMode == 2) {
+            if(overlayMode == 2){
                 overlayImage(img, overlay2, img,
                              cv::Point(center.x - (int) (overlay2.size().width / 2 * (radius / 140.0)),
                                        center.y - (int) (overlay2.size().height / 2 * (radius / 140.0))), radius / 140.0, angle);
@@ -441,8 +468,10 @@ void detectAndDraw( Mat& img, CascadeClassifier& cascade,
     if(!debugMode) {
         putText(img, text, Point(10, 30),
                 CV_FONT_HERSHEY_DUPLEX, 0.8, (0, 255, 255), 2, LINE_AA); //draw text
-        putText(img, "1. emotka, 2. kuc z ASI, 3. bryle, 4. deal with it!", Point(5, 470),
-                FONT_HERSHEY_COMPLEX_SMALL, 0.8, (0, 255, 255), 2, LINE_AA);
+        if(!rollingMode) {
+            putText(img, "1. emotka, 2. kuc z ASI, 3. bryle, 4. deal with it!", Point(5, 470),
+                    FONT_HERSHEY_COMPLEX_SMALL, 0.8, (0, 255, 255), 2, LINE_AA);
+        }
     }
 
     resize(img, img, Size(img.cols*2, img.rows*2)); // scale window
