@@ -4,7 +4,7 @@ ASI DAS promotional app [C++] [OpenCV]
 OpenCV based face recognition demo app; adds funny overlays & animations.
 Created for PWR DAS to promote ASI students' organization.
 
-####Lunch arguments:
+#### Lunch arguments:
 
 default config
 ```
@@ -18,7 +18,7 @@ default config
 * -cycle-time - overlay cycle mode interval in seconds
 
 
-####Usage:
+#### Usage:
 
 * q - quit
 * d - debug mode
