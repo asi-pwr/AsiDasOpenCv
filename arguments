@@ -1,1 +1,1 @@
-./AsiDasOpenCv --cascade="bin/haarcascade_frontalface_alt.xml" --nested-cascade="bin/haarcascade_eye_tree_eyeglasses.xml" --scale=1.3 --cam=1
+./AsiDasOpenCv --cascade="bin/haarcascade_frontalface_alt.xml" --nested-cascade="bin/haarcascade_eye_tree_eyeglasses.xml" --scale=1.0 --cam=1 --cycle-time=5

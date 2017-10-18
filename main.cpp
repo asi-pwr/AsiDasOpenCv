@@ -24,6 +24,7 @@ string nestedCascadeName;
 
 bool debugMode = false;
 bool rollingMode = false;
+int rollingTime = 5;
 
 int overlayMode = 1;
 
@@ -53,7 +54,7 @@ int main( int argc, const char** argv )
         "{help h||}"
         "{cascade|../../data/haarcascades/haarcascade_frontalface_alt.xml|}"
         "{nested-cascade|../../data/haarcascades/haarcascade_eye_tree_eyeglasses.xml|}"
-        "{scale|1|}{cam|0|}{try-flip||}{@filename||}"
+        "{scale|1|}{cam|0|}{cycle-time|5|}{try-flip||}{@filename||}"
     );
 
     if (parser.has("help")) {
@@ -66,6 +67,8 @@ int main( int argc, const char** argv )
     scale = parser.get<double>("scale");
 
     cam = parser.get<double>("cam");
+
+    rollingTime = parser.get<int>("cycle-time");
 
     if (scale < 1){
         scale = 1;
@@ -315,7 +318,7 @@ void detectAndDraw( Mat& img, CascadeClassifier& cascade,
 
     //rolling mode
     if(rollingMode) {
-        if (time(nullptr) - scrollTime > 2) {
+        if (time(nullptr) - scrollTime > rollingTime) { //scrolling through all overlays
             scrollTime = time(nullptr);
             ++overlayMode;
             if (overlayMode == 5) {
